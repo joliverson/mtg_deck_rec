@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "mtg-deck-rec"
+version = "0.1.0"
+description = "Compare your MTG Commander deck against EDHREC recommendations"
+requires-python = ">=3.11"
+dependencies = ["flask>=3.0"]
+
+[project.scripts]
+mtg-deck-rec = "mtg_deck_rec.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]

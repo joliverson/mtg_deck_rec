@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MTG Deck Rec — Commander Deck Optimizer</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <h1>MTG Deck Rec</h1>
+    <p class="subtitle">Compare your Commander deck against EDHREC recommendations</p>
+  </header>
+
+  <main>
+    <!-- Search form -->
+    <section class="search-section">
+      <form id="analyze-form">
+        <div class="input-group">
+          <input
+            type="text"
+            id="deck-url"
+            placeholder="Paste Moxfield deck URL or ID…"
+            required
+            autocomplete="off"
+          >
+          <button type="submit" id="analyze-btn">Analyze</button>
+        </div>
+        <div class="thresholds">
+          <label>
+            Add threshold
+            <input type="number" id="add-threshold" value="0.20" min="0" max="1" step="0.05">
+          </label>
+          <label>
+            Cut threshold
+            <input type="number" id="cut-threshold" value="0.10" min="0" max="1" step="0.05">
+          </label>
+        </div>
+      </form>
+    </section>
+
+    <!-- Loading state -->
+    <div id="loading" class="hidden">
+      <div class="spinner"></div>
+      <p>Fetching deck data and EDHREC recommendations…</p>
+    </div>
+
+    <!-- Error state -->
+    <div id="error" class="hidden">
+      <p id="error-message"></p>
+    </div>
+
+    <!-- Results -->
+    <div id="results" class="hidden">
+      <!-- Deck header -->
+      <section class="deck-header">
+        <div class="commander-card">
+          <img id="commander-img" src="" alt="Commander" loading="lazy">
+        </div>
+        <div class="deck-info">
+          <h2 id="deck-name"></h2>
+          <p id="deck-stats"></p>
+        </div>
+      </section>
+
+      <!-- Tab navigation -->
+      <nav class="tabs">
+        <button class="tab active" data-tab="validated">
+          ✓ Validated <span id="validated-count" class="badge">0</span>
+        </button>
+        <button class="tab" data-tab="recommended">
+          + Additions <span id="recommended-count" class="badge">0</span>
+        </button>
+        <button class="tab" data-tab="cuts">
+          ✗ Cuts <span id="cuts-count" class="badge">0</span>
+        </button>
+      </nav>
+
+      <!-- Card grids -->
+      <section id="tab-validated" class="tab-content active">
+        <p class="tab-description">Cards in your deck that EDHREC agrees with — sorted by synergy score.</p>
+        <div id="grid-validated" class="card-grid"></div>
+      </section>
+
+      <section id="tab-recommended" class="tab-content">
+        <p class="tab-description">Cards not in your deck that EDHREC recommends — high synergy potential additions.</p>
+        <div id="grid-recommended" class="card-grid"></div>
+      </section>
+
+      <section id="tab-cuts" class="tab-content">
+        <p class="tab-description">Cards in your deck with low or no EDHREC presence — consider swapping these out.</p>
+        <div id="grid-cuts" class="card-grid"></div>
+      </section>
+
+      <!-- AI Recommendations Panel -->
+      <section class="ai-section">
+        <div class="ai-header">
+          <div class="ai-title">
+            <span class="ai-icon">&#9733;</span>
+            <h3>AI Deck Advisor</h3>
+          </div>
+          <button id="ai-btn" class="ai-btn" disabled>Get AI Recommendations</button>
+        </div>
+        <div id="ai-status" class="ai-status hidden"></div>
+        <div id="ai-loading" class="ai-loading hidden">
+          <div class="spinner spinner-sm"></div>
+          <span>Analyzing your deck…</span>
+        </div>
+        <div id="ai-output" class="ai-output hidden"></div>
+      </section>
+
+      <!-- Card Evaluation Panel -->
+      <section class="eval-section">
+        <div class="eval-header">
+          <div class="ai-title">
+            <span class="ai-icon">&#128269;</span>
+            <h3>Evaluate Cards</h3>
+          </div>
+        </div>
+        <p class="eval-description">Upload a photo of cards, paste a list, or upload a .txt/.csv file to evaluate them for this deck.</p>
+
+        <div class="eval-inputs">
+          <!-- Image upload -->
+          <div class="eval-input-group">
+            <label class="eval-upload-label" for="eval-image-input">
+              <span class="eval-upload-icon">&#128247;</span>
+              Upload Card Photo
+            </label>
+            <input type="file" id="eval-image-input" accept="image/*" class="eval-file-input">
+            <div id="eval-image-preview" class="eval-image-preview hidden">
+              <img id="eval-preview-img" src="" alt="Preview">
+              <button id="eval-clear-image" class="eval-clear-btn">&times;</button>
+            </div>
+          </div>
+
+          <!-- File upload -->
+          <div class="eval-input-group">
+            <label class="eval-upload-label" for="eval-file-input">
+              <span class="eval-upload-icon">&#128196;</span>
+              Upload .txt / .csv
+            </label>
+            <input type="file" id="eval-file-input" accept=".txt,.csv,text/plain,text/csv" class="eval-file-input">
+          </div>
+
+          <!-- Text input -->
+          <div class="eval-input-group eval-text-group">
+            <textarea id="eval-card-list" rows="4" placeholder="Or type/paste card names, one per line…"></textarea>
+          </div>
+        </div>
+
+        <div class="eval-actions">
+          <span id="eval-card-count" class="eval-card-count"></span>
+          <button id="eval-btn" class="ai-btn" disabled>Evaluate Cards</button>
+        </div>
+
+        <div id="eval-status" class="ai-status hidden"></div>
+        <div id="eval-loading" class="ai-loading hidden">
+          <div class="spinner spinner-sm"></div>
+          <span id="eval-loading-text">Evaluating cards…</span>
+        </div>
+        <div id="eval-output" class="ai-output hidden"></div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Card detail modal -->
+  <div id="card-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <button class="modal-close">&times;</button>
+      <div class="modal-body">
+        <img id="modal-img" src="" alt="">
+        <div class="modal-info">
+          <h3 id="modal-name"></h3>
+          <p id="modal-type"></p>
+          <div class="modal-stats">
+            <div class="stat">
+              <span class="stat-label">Synergy</span>
+              <span id="modal-synergy" class="stat-value"></span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">Inclusion</span>
+              <span id="modal-inclusion" class="stat-value"></span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">Category</span>
+              <span id="modal-category" class="stat-value"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
